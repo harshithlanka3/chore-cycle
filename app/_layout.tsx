@@ -1,5 +1,19 @@
-import { Stack } from "expo-router";
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 
 export default function RootLayout() {
-  return <Stack />;
+  return (
+    <>
+      <StatusBar style="auto" />
+      <Stack>
+        <Stack.Screen 
+          name="index" 
+          options={{ 
+            title: 'Chore Cycle',
+            headerTitleAlign: 'center',
+          }} 
+        />
+      </Stack>
+    </>
+  );
 }

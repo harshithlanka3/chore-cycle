@@ -30,6 +30,7 @@ export default function ChoreCard({
     onDelete(item.id);
   };
 
+  // Use currentPersonIndex instead of current_person_index
   const currentPerson = item.people.length > 0 ? item.people[item.currentPersonIndex] : null;
 
   return (
@@ -87,6 +88,7 @@ export default function ChoreCard({
   );
 }
 
+// Keep your existing styles...
 const styles = StyleSheet.create({
   choreCard: {
     borderRadius: 16,

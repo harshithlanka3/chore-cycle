@@ -9,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import AddPersonModal from '../../components/AddPersonModal';
 import DeletePersonModal from '../../components/DeletePersonModal';
@@ -26,6 +27,7 @@ export default function ChoreDetailScreen() {
   const [personName, setPersonName] = useState('');
   const [nameError, setNameError] = useState('');
   const [personToDelete, setPersonToDelete] = useState<Person | null>(null);
+  const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const chore = getChoreById(id);
@@ -38,16 +40,23 @@ export default function ChoreDetailScreen() {
     );
   }
 
-  const handleAddPerson = () => {
+  const handleAddPerson = async () => {
     if (!personName.trim()) {
       setNameError('Person name is required');
       return;
     }
 
-    addPersonToChore(chore.id, personName);
-    setPersonName('');
-    setNameError('');
-    setIsAddModalVisible(false);
+    try {
+      setLoading(true);
+      await addPersonToChore(chore.id, personName);
+      setPersonName('');
+      setNameError('');
+      setIsAddModalVisible(false);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to add person. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeletePerson = (person: Person) => {
@@ -55,30 +64,45 @@ export default function ChoreDetailScreen() {
     setIsDeleteModalVisible(true);
   };
 
-  const confirmDeletePerson = () => {
+  const confirmDeletePerson = async () => {
     if (personToDelete) {
-      removePersonFromChore(chore.id, personToDelete.id);
+      try {
+        setLoading(true);
+        await removePersonFromChore(chore.id, personToDelete.id);
+      } catch (err) {
+        Alert.alert('Error', 'Failed to remove person. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
     setIsDeleteModalVisible(false);
     setPersonToDelete(null);
   };
 
-  const handleAdvanceQueue = () => {
-    advanceQueue(chore.id);
-    // Scroll to show the new current person
-    if (chore.people.length > 0) {
-      const nextIndex = (chore.currentPersonIndex + 1) % chore.people.length;
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ 
-          index: nextIndex, 
-          animated: true, 
-          viewPosition: 0.5
-        });
-      }, 100);
+  const handleAdvanceQueue = async () => {
+    try {
+      setLoading(true);
+      await advanceQueue(chore.id);
+      // Scroll to show the new current person
+      if (chore.people.length > 0) {
+        const nextIndex = (chore.currentPersonIndex + 1) % chore.people.length;
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ 
+            index: nextIndex, 
+            animated: true, 
+            viewPosition: 0.5
+          });
+        }, 100);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to advance queue. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const renderPerson = ({ item, index }: { item: Person; index: number }) => {
+    // Use currentPersonIndex instead of current_person_index
     const isCurrent = index === chore.currentPersonIndex;
     
     return (
@@ -100,6 +124,7 @@ export default function ChoreDetailScreen() {
           ]}
           onPress={() => handleDeletePerson(item)}
           activeOpacity={0.7}
+          disabled={loading}
         >
           <Ionicons name="close" size={16} color={colors.text} />
         </TouchableOpacity>
@@ -165,8 +190,15 @@ export default function ChoreDetailScreen() {
         <View style={styles.content}>
           {chore.people.length > 0 && (
             <TouchableOpacity
-              style={[styles.advanceButton, { backgroundColor: colors.primary }]}
+              style={[
+                styles.advanceButton, 
+                { 
+                  backgroundColor: colors.primary,
+                  opacity: loading ? 0.6 : 1
+                }
+              ]}
               onPress={handleAdvanceQueue}
+              disabled={loading}
             >
               <Ionicons name="refresh" size={20} color="#fff" />
               <Text style={styles.advanceButtonText}>Next Person</Text>
@@ -208,9 +240,11 @@ export default function ChoreDetailScreen() {
               backgroundColor: colors.primary,
               borderColor: colors.primary,
               shadowColor: colors.shadow,
+              opacity: loading ? 0.6 : 1
             }
           ]}
           onPress={() => setIsAddModalVisible(true)}
+          disabled={loading}
         >
           <Ionicons name="person-add" size={28} color="#fff" />
         </TouchableOpacity>
@@ -247,6 +281,7 @@ export default function ChoreDetailScreen() {
   );
 }
 
+// Keep your existing styles...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -274,10 +309,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   advanceButtonText: {
-  color: '#fff',
-  fontSize: 16,
-  fontWeight: '600',
-  marginLeft: 8,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   queueContainer: {
     flex: 1,

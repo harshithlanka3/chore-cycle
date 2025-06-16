@@ -14,11 +14,11 @@ import CreateChoreModal from '../components/CreateChoreModal';
 import DeleteChoreModal from '../components/DeleteChoreModal';
 import EmptyState from '../components/EmptyState';
 import { colors } from '../constants/colors';
-import { useChores } from '../hooks/useChores';
+import { useChoresContext } from '../contexts/ChoresContext';
 
 export default function HomeScreen() {
   const { width: screenWidth } = useWindowDimensions();
-  const { chores, createChore, deleteChore } = useChores();
+  const { chores, createChore, deleteChore } = useChoresContext();
   
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
@@ -134,8 +134,8 @@ export default function HomeScreen() {
           style={[
             styles.fab,
             {
-              backgroundColor: colors.secondary,
-              borderColor: colors.primary,
+              backgroundColor: colors.primary, // Changed from colors.secondary
+              borderColor: colors.primary,     // Changed from colors.primary
               shadowColor: colors.shadow,
             }
           ]}

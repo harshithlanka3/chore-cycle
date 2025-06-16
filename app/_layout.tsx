@@ -1,9 +1,10 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { ChoresProvider } from '../contexts/ChoresContext';
 
 export default function RootLayout() {
   return (
-    <>
+    <ChoresProvider>
       <StatusBar style="auto" />
       <Stack>
         <Stack.Screen 
@@ -14,6 +15,6 @@ export default function RootLayout() {
           }} 
         />
       </Stack>
-    </>
+    </ChoresProvider>
   );
 }

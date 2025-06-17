@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { Chore } from '../hooks/useChores';
+import * as Clipboard from 'expo-clipboard';
 
 interface ChoreCardProps {
   item: Chore;
@@ -11,6 +11,8 @@ interface ChoreCardProps {
   marginRight: number;
   marginBottom: number;
   onDelete: (id: string) => void;
+  onPress: () => void;
+  currentUserId: string;
 }
 
 export default function ChoreCard({ 
@@ -18,11 +20,13 @@ export default function ChoreCard({
   itemWidth, 
   marginRight, 
   marginBottom, 
-  onDelete 
+  onDelete,
+  onPress,
+  currentUserId
 }: ChoreCardProps) {
   
   const handleCardPress = () => {
-    router.push(`/chore/${item.id}`);
+    onPress();
   };
 
   const handleDeletePress = (e: any) => {
@@ -30,8 +34,20 @@ export default function ChoreCard({
     onDelete(item.id);
   };
 
-  // Use currentPersonIndex instead of current_person_index
-  const currentPerson = item.people.length > 0 ? item.people[item.currentPersonIndex] : null;
+  const handleCopyId = async (e: any) => {
+    e.stopPropagation();
+    await Clipboard.setStringAsync(item.id);
+  };
+
+  // Safely handle currentPerson with proper validation
+  const currentPerson = (item.people && item.people.length > 0 && 
+                        typeof item.currentPersonIndex === 'number' && 
+                        item.currentPersonIndex >= 0 && 
+                        item.currentPersonIndex < item.people.length) 
+                        ? item.people[item.currentPersonIndex] 
+                        : null;
+  
+  const isOwner = item.owner_id === currentUserId;
 
   return (
     <TouchableOpacity 
@@ -49,25 +65,59 @@ export default function ChoreCard({
       onPress={handleCardPress}
       activeOpacity={0.8}
     >
-      <TouchableOpacity
-        style={[
-          styles.deleteButton,
-          {
-            backgroundColor: colors.deleteButton,
-            borderColor: colors.deleteBorder,
-          }
-        ]}
-        onPress={handleDeletePress}
-        activeOpacity={0.7}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="close" size={16} color={colors.text} />
-      </TouchableOpacity>
+      {/* Top row: Copy ID and Delete buttons */}
+      <View style={styles.topRow}>
+        <TouchableOpacity
+          style={[
+            styles.copyButton,
+            {
+              backgroundColor: colors.primary,
+            }
+          ]}
+          onPress={handleCopyId}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="copy" size={14} color="#fff" />
+        </TouchableOpacity>
+        
+        {isOwner && (
+          <TouchableOpacity
+            style={[
+              styles.deleteButton,
+              {
+                backgroundColor: colors.primary,
+                borderColor: colors.primary,
+              }
+            ]}
+            onPress={handleDeletePress}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={16} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
       
       <View style={styles.choreContent}>
         <Text style={[styles.choreName, { color: colors.text }]} numberOfLines={2}>
-          {item.name}
+          {item.name || 'Unnamed Chore'}
         </Text>
+        
+        {/* Ownership indicator */}
+        <View style={styles.ownershipContainer}>
+          <Ionicons 
+            name={isOwner ? "person" : "people"} 
+            size={12} 
+            color={isOwner ? colors.primary : colors.createButton} 
+          />
+          <Text style={[
+            styles.ownershipText, 
+            { color: isOwner ? colors.primary : colors.createButton }
+          ]}>
+            {isOwner ? 'Owner' : 'Member'}
+          </Text>
+        </View>
         
         {currentPerson && (
           <View style={styles.currentPersonContainer}>
@@ -75,20 +125,24 @@ export default function ChoreCard({
               Current:
             </Text>
             <Text style={[styles.currentPersonName, { color: colors.primary }]} numberOfLines={1}>
-              {currentPerson.name}
+              {currentPerson.name || 'Unknown'}
             </Text>
           </View>
         )}
         
         <Text style={[styles.peopleCount, { color: colors.secondaryText }]}>
-          {item.people.length} {item.people.length === 1 ? 'person' : 'people'}
+          {(item.people?.length || 0)} {(item.people?.length || 0) === 1 ? 'person' : 'people'}
+        </Text>
+
+        {/* Truncated ID display */}
+        <Text style={[styles.choreId, { color: colors.secondaryText }]} numberOfLines={1}>
+          ID: {item.id ? item.id.substring(0, 8) + '...' : 'No ID'}
         </Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-// Keep your existing styles...
 const styles = StyleSheet.create({
   choreCard: {
     borderRadius: 16,
@@ -104,16 +158,36 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderWidth: 2,
   },
-  deleteButton: {
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     position: 'absolute',
     top: 8,
+    left: 8,
     right: 8,
+    zIndex: 10,
+  },
+  copyButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  deleteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: {
@@ -129,13 +203,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 8,
+    paddingTop: 20, // Account for top buttons
   },
   choreName: {
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 8,
+    marginBottom: 6,
+  },
+  ownershipContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  ownershipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   currentPersonContainer: {
     alignItems: 'center',
@@ -154,5 +239,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     marginTop: 4,
+  },
+  choreId: {
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 4,
+    fontFamily: 'monospace',
   },
 });

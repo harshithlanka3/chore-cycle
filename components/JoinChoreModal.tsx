@@ -1,31 +1,31 @@
 import React from 'react';
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { colors } from '../constants/colors';
 
-interface AddPersonModalProps {
+interface JoinChoreModalProps {
   visible: boolean;
-  email: string; // Changed from username to email
-  nameError: string;
+  choreId: string;
+  idError: string;
   onClose: () => void;
-  onAddPerson: () => void;
-  onEmailChange: (text: string) => void; // Changed from onUsernameChange
+  onJoinChore: () => void;
+  onIdChange: (text: string) => void;
 }
 
-export default function AddPersonModal({
+export default function JoinChoreModal({
   visible,
-  email,
-  nameError,
+  choreId,
+  idError,
   onClose,
-  onAddPerson,
-  onEmailChange,
-}: AddPersonModalProps) {
+  onJoinChore,
+  onIdChange,
+}: JoinChoreModalProps) {
   return (
     <Modal
       visible={visible}
@@ -41,9 +41,9 @@ export default function AddPersonModal({
             borderColor: colors.cardBorder,
           }
         ]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Add Person</Text>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Join Chore</Text>
           <Text style={[styles.modalSubtitle, { color: colors.secondaryText }]}>
-            Enter the email of a registered user
+            Enter the chore ID to join an existing chore
           </Text>
           
           <TextInput
@@ -51,23 +51,20 @@ export default function AddPersonModal({
               styles.input,
               {
                 backgroundColor: colors.input,
-                borderColor: nameError ? '#ef4444' : colors.inputBorder,
+                borderColor: idError ? '#ef4444' : colors.inputBorder,
                 color: colors.text,
               },
-              nameError ? styles.inputError : null
+              idError ? styles.inputError : null
             ]}
-            value={email}
-            onChangeText={onEmailChange}
-            placeholder="Enter email"
+            value={choreId}
+            onChangeText={onIdChange}
+            placeholder="Enter chore ID"
             placeholderTextColor={colors.secondaryText}
             autoFocus
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onSubmitEditing={onAddPerson}
+            onSubmitEditing={onJoinChore}
           />
 
-          {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+          {idError ? <Text style={styles.errorText}>{idError}</Text> : null}
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
@@ -85,15 +82,15 @@ export default function AddPersonModal({
             
             <TouchableOpacity
               style={[
-                styles.addButton,
+                styles.joinButton,
                 {
                   backgroundColor: colors.createButton,
                   borderColor: colors.text,
                 }
               ]}
-              onPress={onAddPerson}
+              onPress={onJoinChore}
             >
-              <Text style={[styles.addButtonText, { color: colors.createButtonText }]}>Add</Text>
+              <Text style={[styles.joinButtonText, { color: colors.createButtonText }]}>Join</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -160,14 +157,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  addButton: {
+  joinButton: {
     flex: 1,
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
   },
-  addButtonText: {
+  joinButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },

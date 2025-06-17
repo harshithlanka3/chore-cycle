@@ -4,8 +4,10 @@ class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private currentUrl = '';
 
   connect(url: string = 'ws://localhost:8000/ws') {
+    this.currentUrl = url;
     try {
       this.ws = new WebSocket(url);
 
@@ -27,7 +29,7 @@ class WebSocketService {
 
       this.ws.onclose = () => {
         console.log('WebSocket disconnected');
-        this.attemptReconnect(url);
+        this.attemptReconnect();
       };
 
       this.ws.onerror = (error) => {
@@ -35,17 +37,17 @@ class WebSocketService {
       };
     } catch (error) {
       console.error('Error connecting to WebSocket:', error);
-      this.attemptReconnect(url);
+      this.attemptReconnect();
     }
   }
 
-  private attemptReconnect(url: string) {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+  private attemptReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts && this.currentUrl) {
       this.reconnectAttempts++;
       console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
-        this.connect(url);
+        this.connect(this.currentUrl);
       }, this.reconnectDelay * this.reconnectAttempts);
     }
   }
@@ -81,6 +83,7 @@ class WebSocketService {
       this.ws.close();
       this.ws = null;
     }
+    this.currentUrl = '';
   }
 }
 

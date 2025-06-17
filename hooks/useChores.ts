@@ -1,23 +1,28 @@
 import { useState, useEffect } from 'react';
-import { choreApi } from '../services/api';
+import { apiService } from '../services/api';
 import { websocketService } from '../services/websocket';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface Person {
   id: string;
   name: string;
+  user_id: string;
 }
 
 export interface Chore {
   id: string;
   name: string;
   people: Person[];
-  currentPersonIndex: number; // Convert from current_person_index
+  currentPersonIndex: number;
+  createdBy: string;
+  createdByName: string;
 }
 
 export const useChores = () => {
   const [chores, setChores] = useState<Chore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, token, user } = useAuth();
 
   // Convert backend format to frontend format
   const convertChore = (backendChore: any): Chore => ({
@@ -25,15 +30,30 @@ export const useChores = () => {
     name: backendChore.name,
     people: backendChore.people,
     currentPersonIndex: backendChore.current_person_index,
+    createdBy: backendChore.created_by,
+    createdByName: backendChore.created_by_name,
   });
+
+  // Check if current user is participant in a chore
+  const isUserParticipant = (chore: Chore): boolean => {
+    return user ? chore.people.some(person => person.user_id === user.id) : false;
+  };
 
   // Load chores from API
   const loadChores = async () => {
+    if (!isAuthenticated || !user) return;
+    
     try {
       setLoading(true);
       setError(null);
-      const fetchedChores = await choreApi.getAllChores();
-      setChores(fetchedChores.map(convertChore));
+      const fetchedChores = await apiService.getAllChores();
+      
+      // Double-check filtering on frontend (backend should already filter)
+      const userChores = fetchedChores
+        .map(convertChore)
+        .filter(chore => isUserParticipant(chore));
+      
+      setChores(userChores);
     } catch (err) {
       setError('Failed to load chores');
       console.error('Error loading chores:', err);
@@ -44,15 +64,24 @@ export const useChores = () => {
 
   // Setup WebSocket listeners
   useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setChores([]);
+      setLoading(false);
+      return;
+    }
+
     loadChores();
     
     // Connect to WebSocket
-    websocketService.connect();
+    websocketService.connect('ws://localhost:8000/ws');
 
     // Listen for real-time updates
     const handleChoreCreated = (data: any) => {
       const newChore = convertChore(data.chore);
-      setChores(prev => [...prev, newChore]);
+      // Only add if current user is a participant
+      if (isUserParticipant(newChore)) {
+        setChores(prev => [...prev, newChore]);
+      }
     };
 
     const handleChoreDeleted = (data: any) => {
@@ -61,9 +90,23 @@ export const useChores = () => {
 
     const handleChoreUpdated = (data: any) => {
       const updatedChore = convertChore(data.chore);
-      setChores(prev => prev.map(chore => 
-        chore.id === data.chore_id ? updatedChore : chore
-      ));
+      
+      setChores(prev => {
+        // If user is no longer a participant, remove the chore
+        if (!isUserParticipant(updatedChore)) {
+          return prev.filter(chore => chore.id !== data.chore_id);
+        }
+        
+        // If user is a participant, update or add the chore
+        const existingIndex = prev.findIndex(chore => chore.id === data.chore_id);
+        if (existingIndex >= 0) {
+          const newChores = [...prev];
+          newChores[existingIndex] = updatedChore;
+          return newChores;
+        } else {
+          return [...prev, updatedChore];
+        }
+      });
     };
 
     websocketService.addEventListener('chore_created', handleChoreCreated);
@@ -80,11 +123,11 @@ export const useChores = () => {
       websocketService.removeEventListener('queue_advanced', handleChoreUpdated);
       websocketService.disconnect();
     };
-  }, []);
+  }, [isAuthenticated, token, user]);
 
   const createChore = async (name: string) => {
     try {
-      await choreApi.createChore({ name });
+      await apiService.createChore({ name });
       // WebSocket will handle updating the state
     } catch (err) {
       setError('Failed to create chore');
@@ -94,7 +137,7 @@ export const useChores = () => {
 
   const deleteChore = async (id: string) => {
     try {
-      await choreApi.deleteChore(id);
+      await apiService.deleteChore(id);
       // WebSocket will handle updating the state
     } catch (err) {
       setError('Failed to delete chore');
@@ -102,9 +145,9 @@ export const useChores = () => {
     }
   };
 
-  const addPersonToChore = async (choreId: string, personName: string) => {
+  const addPersonToChore = async (choreId: string, email: string) => {
     try {
-      await choreApi.addPerson(choreId, { name: personName });
+      await apiService.addPersonToChore(choreId, { email });
       // WebSocket will handle updating the state
     } catch (err) {
       setError('Failed to add person');
@@ -114,7 +157,7 @@ export const useChores = () => {
 
   const removePersonFromChore = async (choreId: string, personId: string) => {
     try {
-      await choreApi.removePerson(choreId, personId);
+      await apiService.removePersonFromChore(choreId, personId);
       // WebSocket will handle updating the state
     } catch (err) {
       setError('Failed to remove person');
@@ -124,7 +167,7 @@ export const useChores = () => {
 
   const advanceQueue = async (choreId: string) => {
     try {
-      await choreApi.advanceQueue(choreId);
+      await apiService.advanceQueue(choreId);
       // WebSocket will handle updating the state
     } catch (err) {
       setError('Failed to advance queue');
@@ -132,14 +175,29 @@ export const useChores = () => {
     }
   };
 
-  const getChoreById = (id: string) => {
-    return chores.find(chore => chore.id === id);
+  const leaveChore = async (choreId: string) => {
+    try {
+      await apiService.leaveChore(choreId);
+      // WebSocket will handle updating the state
+    } catch (err) {
+      setError('Failed to leave chore');
+      throw err;
+    }
   };
 
-  // Note: reorderPeopleInChore is not implemented in the backend yet
-  const reorderPeopleInChore = (choreId: string, newPeople: Person[], newCurrentIndex: number) => {
-    // This would need a new backend endpoint
-    console.warn('Reorder functionality not implemented in backend yet');
+  const joinChore = async (choreId: string) => {
+    try {
+      await apiService.joinChore({ chore_id: choreId });
+      // Refresh chores after joining
+      await loadChores();
+    } catch (err) {
+      setError('Failed to join chore');
+      throw err;
+    }
+  };
+
+  const getChoreById = (id: string) => {
+    return chores.find(chore => chore.id === id);
   };
 
   return {
@@ -151,8 +209,9 @@ export const useChores = () => {
     addPersonToChore,
     removePersonFromChore,
     advanceQueue,
+    leaveChore,
+    joinChore,
     getChoreById,
-    reorderPeopleInChore,
     refreshChores: loadChores,
   };
 };

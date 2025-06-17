@@ -9,22 +9,24 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert,
+  Share,
 } from 'react-native';
 import AddPersonModal from '../../components/AddPersonModal';
 import DeletePersonModal from '../../components/DeletePersonModal';
 import { colors } from '../../constants/colors';
 import { useChoresContext } from '../../contexts/ChoresContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Person } from '../../hooks/useChores';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 export default function ChoreDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getChoreById, addPersonToChore, removePersonFromChore, advanceQueue } = useChoresContext();
+  const { getChoreById, addPersonToChore, removePersonFromChore, advanceQueue, leaveChore } = useChoresContext();
+  const { user } = useAuth();
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [personName, setPersonName] = useState('');
+  const [email, setEmail] = useState(''); // Changed from username to email
   const [nameError, setNameError] = useState('');
   const [personToDelete, setPersonToDelete] = useState<Person | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,25 +37,47 @@ export default function ChoreDetailScreen() {
   if (!chore) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>Chore not found</Text>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={64} color={colors.primary} />
+          <Text style={[styles.errorText, { color: colors.text }]}>Chore not found</Text>
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
   const handleAddPerson = async () => {
-    if (!personName.trim()) {
-      setNameError('Person name is required');
+    if (!email.trim()) {
+      setNameError('Email is required');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setNameError('Please enter a valid email address');
       return;
     }
 
     try {
       setLoading(true);
-      await addPersonToChore(chore.id, personName);
-      setPersonName('');
+      await addPersonToChore(chore.id, email.trim().toLowerCase());
+      setEmail('');
       setNameError('');
       setIsAddModalVisible(false);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to add person. Please try again.');
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setNameError('User not found');
+      } else if (err.response?.status === 400) {
+        setNameError('User is already part of this chore');
+      } else {
+        setNameError('Failed to add person. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -70,7 +94,7 @@ export default function ChoreDetailScreen() {
         setLoading(true);
         await removePersonFromChore(chore.id, personToDelete.id);
       } catch (err) {
-        Alert.alert('Error', 'Failed to remove person. Please try again.');
+        console.error('Failed to remove person');
       } finally {
         setLoading(false);
       }
@@ -95,15 +119,39 @@ export default function ChoreDetailScreen() {
         }, 100);
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to advance queue. Please try again.');
+      console.error('Failed to advance queue');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleLeaveChore = async () => {
+    try {
+      setLoading(true);
+      await leaveChore(chore.id);
+      router.back();
+    } catch (err) {
+      console.error('Failed to leave chore');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShareChore = async () => {
+    try {
+      await Share.share({
+        message: `Join my chore "${chore.name}"! Use this ID: ${chore.id}`,
+        title: 'Join Chore',
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
   const renderPerson = ({ item, index }: { item: Person; index: number }) => {
-    // Use currentPersonIndex instead of current_person_index
     const isCurrent = index === chore.currentPersonIndex;
+    const isCurrentUser = user && item.user_id === user.id; // Changed from item.name === user.username
+    const canRemove = user && (chore.createdBy === user.id || isCurrentUser);
     
     return (
       <View style={[
@@ -114,20 +162,22 @@ export default function ChoreDetailScreen() {
           shadowColor: colors.shadow,
         }
       ]}>
-        <TouchableOpacity
-          style={[
-            styles.deletePersonButton,
-            {
-              backgroundColor: colors.deleteButton,
-              borderColor: colors.deleteBorder,
-            }
-          ]}
-          onPress={() => handleDeletePerson(item)}
-          activeOpacity={0.7}
-          disabled={loading}
-        >
-          <Ionicons name="close" size={16} color={colors.text} />
-        </TouchableOpacity>
+        {canRemove && (
+          <TouchableOpacity
+            style={[
+              styles.deletePersonButton,
+              {
+                backgroundColor: colors.deleteButton,
+                borderColor: colors.deleteBorder,
+              }
+            ]}
+            onPress={() => handleDeletePerson(item)}
+            activeOpacity={0.7}
+            disabled={loading}
+          >
+            <Ionicons name="close" size={16} color={colors.text} />
+          </TouchableOpacity>
+        )}
         
         <View style={styles.personContent}>
           {isCurrent && (
@@ -140,6 +190,7 @@ export default function ChoreDetailScreen() {
             { color: isCurrent ? '#fff' : colors.text }
           ]} numberOfLines={2}>
             {item.name}
+            {isCurrentUser && ' (You)'}
           </Text>
         </View>
       </View>
@@ -157,10 +208,14 @@ export default function ChoreDetailScreen() {
   );
 
   const getItemLayout = (_: any, index: number) => ({
-    length: 192, // Height of card (180) + margin (12)
+    length: 192,
     offset: 192 * index,
     index,
   });
+
+  const isCreator = user && chore.createdBy === user.id;
+  const isParticipant = user && chore.people.some(p => p.user_id === user.id); // Changed from p.name === user.username
+  const currentPerson = chore.people.length > 0 ? chore.people[chore.currentPersonIndex] : null;
 
   return (
     <>
@@ -181,13 +236,54 @@ export default function ChoreDetailScreen() {
               style={styles.homeButton}
               onPress={() => router.back()}
             >
-              <Ionicons name="home" size={24} color="#fff" />
+              <Ionicons name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
+          ),
+          headerRight: () => (
+            <View style={styles.headerButtons}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={handleShareChore}
+              >
+                <Ionicons name="share" size={24} color="#fff" />
+              </TouchableOpacity>
+              {isParticipant && !isCreator && (
+                <TouchableOpacity
+                  style={styles.headerButton}
+                  onPress={handleLeaveChore}
+                  disabled={loading}
+                >
+                  <Ionicons name="exit" size={24} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
           ),
         }}
       />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.content}>
+          {/* Chore Info Section */}
+          <View style={styles.choreInfoContainer}>
+            <Text style={[styles.choreTitle, { color: colors.text }]}>{chore.name}</Text>
+            {chore.createdByName && (
+              <Text style={[styles.createdByText, { color: colors.secondaryText }]}>
+                Created by {chore.createdByName}
+              </Text>
+            )}
+            {currentPerson && (
+              <View style={styles.currentPersonInfo}>
+                <Text style={[styles.currentPersonLabel, { color: colors.secondaryText }]}>
+                  Current turn:
+                </Text>
+                <Text style={[styles.currentPersonName, { color: colors.primary }]}>
+                  {currentPerson.name}
+                  {user && currentPerson.user_id === user.id && ' (You)'}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Advance Button */}
           {chore.people.length > 0 && (
             <TouchableOpacity
               style={[
@@ -205,11 +301,14 @@ export default function ChoreDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* People List */}
           {chore.people.length === 0 ? (
             renderEmptyState()
           ) : (
             <View style={styles.queueContainer}>
-              <Text style={[styles.queueTitle, { color: colors.text }]}>People Queue</Text>
+              <Text style={[styles.queueTitle, { color: colors.text }]}>
+                People Queue ({chore.people.length})
+              </Text>
               <FlatList
                 ref={flatListRef}
                 data={chore.people}
@@ -233,6 +332,7 @@ export default function ChoreDetailScreen() {
           )}
         </View>
 
+        {/* Add Person FAB */}
         <TouchableOpacity
           style={[
             styles.fab,
@@ -249,24 +349,26 @@ export default function ChoreDetailScreen() {
           <Ionicons name="person-add" size={28} color="#fff" />
         </TouchableOpacity>
 
+        {/* Add Person Modal */}
         <AddPersonModal
           visible={isAddModalVisible}
-          personName={personName}
+          email={email} // Changed from username
           nameError={nameError}
           onClose={() => {
-            setPersonName('');
+            setEmail('');
             setNameError('');
             setIsAddModalVisible(false);
           }}
           onAddPerson={handleAddPerson}
-          onNameChange={(text) => {
-            setPersonName(text);
+          onEmailChange={(text) => { // Changed from onUsernameChange
+            setEmail(text);
             if (nameError && text.trim()) {
               setNameError('');
             }
           }}
         />
 
+        {/* Delete Person Modal */}
         <DeletePersonModal
           visible={isDeleteModalVisible}
           personName={personToDelete?.name || ''}
@@ -281,7 +383,6 @@ export default function ChoreDetailScreen() {
   );
 }
 
-// Keep your existing styles...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -290,27 +391,83 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
   errorText: {
-    fontSize: 18,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 24,
     textAlign: 'center',
-    marginTop: 50,
+  },
+  backButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   homeButton: {
     marginLeft: 16,
     paddingVertical: 8,
     paddingHorizontal: 8,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    marginRight: 16,
+    padding: 4,
+  },
+  choreInfoContainer: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: colors.cardBorder,
+  },
+  choreTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  createdByText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  currentPersonInfo: {
+    alignItems: 'center',
+  },
+  currentPersonLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  currentPersonName: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
   advanceButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 24,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   advanceButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     marginLeft: 8,
   },
@@ -340,8 +497,8 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 2,
     position: 'relative',
-    width: 180,
-    height: 180,
+    width: screenWidth - 64, // Full width minus padding
+    maxWidth: 300,
   },
   deletePersonButton: {
     position: 'absolute',
@@ -360,24 +517,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 8,
+    paddingRight: 40, // Account for delete button
   },
   currentBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     marginBottom: 12,
   },
   currentBadgeText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   personName: {
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
   },
   emptyState: {
     flex: 1,
@@ -390,6 +549,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptyDescription: {
     fontSize: 16,

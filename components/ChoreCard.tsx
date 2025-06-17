@@ -4,6 +4,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../constants/colors';
 import { Chore } from '../hooks/useChores';
+import { User } from '../services/api';
 
 interface ChoreCardProps {
   item: Chore;
@@ -11,6 +12,7 @@ interface ChoreCardProps {
   marginRight: number;
   marginBottom: number;
   onDelete: (id: string) => void;
+  currentUser: User | null;
 }
 
 export default function ChoreCard({ 
@@ -18,7 +20,8 @@ export default function ChoreCard({
   itemWidth, 
   marginRight, 
   marginBottom, 
-  onDelete 
+  onDelete,
+  currentUser
 }: ChoreCardProps) {
   
   const handleCardPress = () => {
@@ -30,8 +33,8 @@ export default function ChoreCard({
     onDelete(item.id);
   };
 
-  // Use currentPersonIndex instead of current_person_index
   const currentPerson = item.people.length > 0 ? item.people[item.currentPersonIndex] : null;
+  const canDelete = currentUser && item.createdBy === currentUser.id;
 
   return (
     <TouchableOpacity 
@@ -49,25 +52,33 @@ export default function ChoreCard({
       onPress={handleCardPress}
       activeOpacity={0.8}
     >
-      <TouchableOpacity
-        style={[
-          styles.deleteButton,
-          {
-            backgroundColor: colors.deleteButton,
-            borderColor: colors.deleteBorder,
-          }
-        ]}
-        onPress={handleDeletePress}
-        activeOpacity={0.7}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="close" size={16} color={colors.text} />
-      </TouchableOpacity>
+      {canDelete && (
+        <TouchableOpacity
+          style={[
+            styles.deleteButton,
+            {
+              backgroundColor: colors.deleteButton,
+              borderColor: colors.deleteBorder,
+            }
+          ]}
+          onPress={handleDeletePress}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="close" size={16} color={colors.text} />
+        </TouchableOpacity>
+      )}
       
       <View style={styles.choreContent}>
         <Text style={[styles.choreName, { color: colors.text }]} numberOfLines={2}>
           {item.name}
         </Text>
+        
+        {item.createdByName && (
+          <Text style={[styles.createdBy, { color: colors.secondaryText }]} numberOfLines={1}>
+            by {item.createdByName}
+          </Text>
+        )}
         
         {currentPerson && (
           <View style={styles.currentPersonContainer}>
@@ -88,7 +99,6 @@ export default function ChoreCard({
   );
 }
 
-// Keep your existing styles...
 const styles = StyleSheet.create({
   choreCard: {
     borderRadius: 16,
@@ -135,6 +145,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 22,
+    marginBottom: 4,
+  },
+  createdBy: {
+    fontSize: 12,
+    fontWeight: '500',
     marginBottom: 8,
   },
   currentPersonContainer: {

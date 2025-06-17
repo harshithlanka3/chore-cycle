@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
-  Alert,
   ActivityIndicator,
   Text,
   RefreshControl,
@@ -16,18 +15,24 @@ import {
 import ChoreCard from '../components/ChoreCard';
 import CreateChoreModal from '../components/CreateChoreModal';
 import DeleteChoreModal from '../components/DeleteChoreModal';
+import JoinChoreModal from '../components/JoinChoreModal';
 import EmptyState from '../components/EmptyState';
 import { colors } from '../constants/colors';
 import { useChoresContext } from '../contexts/ChoresContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function HomeScreen() {
   const { width: screenWidth } = useWindowDimensions();
-  const { chores, loading, error, createChore, deleteChore, refreshChores } = useChoresContext();
+  const { chores, loading, error, createChore, deleteChore, refreshChores, joinChore } = useChoresContext();
+  const { user, logout } = useAuth();
   
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [choreName, setChoreName] = useState('');
+  const [choreId, setChoreId] = useState('');
   const [nameError, setNameError] = useState('');
+  const [idError, setIdError] = useState('');
   const [choreToDelete, setChoreToDelete] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -57,7 +62,29 @@ export default function HomeScreen() {
       setNameError('');
       setIsCreateModalVisible(false);
     } catch (err) {
-      Alert.alert('Error', 'Failed to create chore. Please try again.');
+      setNameError('Failed to create chore. Please try again.');
+    }
+  };
+
+  const handleJoinChore = async () => {
+    if (!choreId.trim()) {
+      setIdError('Chore ID is required');
+      return;
+    }
+
+    try {
+      await joinChore(choreId.trim());
+      setChoreId('');
+      setIdError('');
+      setIsJoinModalVisible(false);
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setIdError('Chore not found');
+      } else if (err.response?.status === 400) {
+        setIdError('You are already part of this chore');
+      } else {
+        setIdError('Failed to join chore. Please try again.');
+      }
     }
   };
 
@@ -71,7 +98,7 @@ export default function HomeScreen() {
       try {
         await deleteChore(choreToDelete);
       } catch (err) {
-        Alert.alert('Error', 'Failed to delete chore. Please try again.');
+        console.error('Failed to delete chore');
       }
     }
     setIsDeleteModalVisible(false);
@@ -83,10 +110,16 @@ export default function HomeScreen() {
     setChoreToDelete(null);
   };
 
-  const handleCancel = () => {
+  const handleCreateCancel = () => {
     setChoreName('');
     setNameError('');
     setIsCreateModalVisible(false);
+  };
+
+  const handleJoinCancel = () => {
+    setChoreId('');
+    setIdError('');
+    setIsJoinModalVisible(false);
   };
 
   const handleNameChange = (text: string) => {
@@ -96,12 +129,19 @@ export default function HomeScreen() {
     }
   };
 
+  const handleIdChange = (text: string) => {
+    setChoreId(text);
+    if (idError && text.trim()) {
+      setIdError('');
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       await refreshChores();
     } catch (err) {
-      Alert.alert('Error', 'Failed to refresh chores.');
+      console.error('Failed to refresh chores');
     } finally {
       setRefreshing(false);
     }
@@ -118,6 +158,7 @@ export default function HomeScreen() {
         marginRight={marginRight}
         marginBottom={gap}
         onDelete={handleDeleteChore}
+        currentUser={user}
       />
     );
   };
@@ -171,6 +212,22 @@ export default function HomeScreen() {
             fontWeight: 'bold',
           },
           headerShadowVisible: false,
+          headerRight: () => (
+            <View style={styles.headerButtons}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => setIsJoinModalVisible(true)}
+              >
+                <Ionicons name="enter" size={24} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={logout}
+              >
+                <Ionicons name="log-out" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ),
         }}
       />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -213,9 +270,18 @@ export default function HomeScreen() {
           visible={isCreateModalVisible}
           choreName={choreName}
           nameError={nameError}
-          onClose={handleCancel}
+          onClose={handleCreateCancel}
           onCreateChore={handleCreateChore}
           onNameChange={handleNameChange}
+        />
+
+        <JoinChoreModal
+          visible={isJoinModalVisible}
+          choreId={choreId}
+          idError={idError}
+          onClose={handleJoinCancel}
+          onJoinChore={handleJoinChore}
+          onIdChange={handleIdChange}
         />
 
         <DeleteChoreModal
@@ -274,6 +340,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    marginLeft: 16,
+    padding: 4,
   },
   fab: {
     position: 'absolute',

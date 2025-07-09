@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Text,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import ChoreCard from '../components/ChoreCard';
 import CreateChoreModal from '../components/CreateChoreModal';
@@ -29,6 +30,7 @@ export default function HomeScreen() {
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
   const [choreName, setChoreName] = useState('');
   const [choreId, setChoreId] = useState('');
   const [nameError, setNameError] = useState('');
@@ -122,6 +124,19 @@ export default function HomeScreen() {
     setIsJoinModalVisible(false);
   };
 
+  const handleLogoutPress = () => {
+    setIsLogoutModalVisible(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutModalVisible(false);
+    logout();
+  };
+
+  const cancelLogout = () => {
+    setIsLogoutModalVisible(false);
+  };
+
   const handleNameChange = (text: string) => {
     setChoreName(text);
     if (nameError && text.trim()) {
@@ -213,20 +228,12 @@ export default function HomeScreen() {
           },
           headerShadowVisible: false,
           headerRight: () => (
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => setIsJoinModalVisible(true)}
-              >
-                <Ionicons name="enter" size={24} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={logout}
-              >
-                <Ionicons name="log-out" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogoutPress}
+            >
+              <Ionicons name="log-out" size={24} color="#ef4444" />
+            </TouchableOpacity>
           ),
         }}
       />
@@ -252,9 +259,10 @@ export default function HomeScreen() {
           />
         </View>
 
+        {/* Create Chore Button */}
         <TouchableOpacity
           style={[
-            styles.fab,
+            styles.createButton,
             {
               backgroundColor: colors.primary,
               borderColor: colors.primary,
@@ -264,6 +272,21 @@ export default function HomeScreen() {
           onPress={() => setIsCreateModalVisible(true)}
         >
           <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+
+        {/* Join Chore Button */}
+        <TouchableOpacity
+          style={[
+            styles.joinButton,
+            {
+              backgroundColor: colors.primary,
+              borderColor: colors.primary,
+              shadowColor: colors.shadow,
+            }
+          ]}
+          onPress={() => setIsJoinModalVisible(true)}
+        >
+          <Ionicons name="enter" size={28} color="#fff" />
         </TouchableOpacity>
 
         <CreateChoreModal
@@ -289,6 +312,56 @@ export default function HomeScreen() {
           onConfirm={confirmDelete}
           onCancel={cancelDelete}
         />
+
+        {/* Logout Confirmation Modal */}
+        <Modal
+          visible={isLogoutModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={cancelLogout}
+        >
+          <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
+            <View style={[
+              styles.modalContent,
+              {
+                backgroundColor: colors.cardBackground,
+                borderColor: colors.cardBorder,
+              }
+            ]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Confirm Logout</Text>
+              <Text style={[styles.modalMessage, { color: colors.secondaryText }]}>
+                Are you sure you want to logout?
+              </Text>
+              
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.cancelButton,
+                    {
+                      backgroundColor: colors.primary,
+                      borderColor: colors.text,
+                    }
+                  ]}
+                  onPress={cancelLogout}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.logoutConfirmButton,
+                    {
+                      borderColor: colors.text,
+                    }
+                  ]}
+                  onPress={confirmLogout}
+                >
+                  <Text style={styles.logoutConfirmButtonText}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </>
   );
@@ -341,15 +414,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  logoutButton: {
+    marginRight: 16,
+    padding: 8,
   },
-  headerButton: {
-    marginLeft: 16,
-    padding: 4,
-  },
-  fab: {
+  createButton: {
     position: 'absolute',
     bottom: 24,
     right: 24,
@@ -366,5 +435,76 @@ const styles = StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 8,
     borderWidth: 2,
+  },
+  joinButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 88,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    borderWidth: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 2,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  logoutConfirmButton: {
+    flex: 1,
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  logoutConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

@@ -29,48 +29,44 @@ export default function AuthScreen() {
 
     // Validation
     if (!email.trim() || !password.trim()) {
-      setError('Email and password are required');
-      return;
+        setError('Email and password are required');
+        return;
     }
 
     if (!isLogin && !fullName.trim()) {
-      setError('Full name is required for registration');
-      return;
+        setError('Full name is required for registration');
+        return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      setError('Please enter a valid email address');
-      return;
+        setError('Please enter a valid email address');
+        return;
     }
 
-    // Password validation
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return;
-    }
+    // Password validation removed - no minimum length requirement
 
     try {
-      setLoading(true);
+        setLoading(true);
 
-      if (isLogin) {
+        if (isLogin) {
         await login({ 
-          email: email.trim().toLowerCase(), 
-          password 
+            email: email.trim().toLowerCase(), 
+            password 
         });
-      } else {
+        } else {
         await register({ 
-          email: email.trim().toLowerCase(), 
-          password, 
-          full_name: fullName.trim() 
+            email: email.trim().toLowerCase(), 
+            password, 
+            full_name: fullName.trim() 
         });
-      }
+        }
     } catch (err: any) {
-      console.error('Auth error:', err);
-      setError(err.message || 'Authentication failed');
+        console.error('Auth error:', err);
+        setError(err.message || 'Authentication failed');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 

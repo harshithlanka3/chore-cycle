@@ -16,7 +16,6 @@ import {
 import ChoreCard from '../components/ChoreCard';
 import CreateChoreModal from '../components/CreateChoreModal';
 import DeleteChoreModal from '../components/DeleteChoreModal';
-import JoinChoreModal from '../components/JoinChoreModal';
 import EmptyState from '../components/EmptyState';
 import { colors } from '../constants/colors';
 import { useChoresContext } from '../contexts/ChoresContext';
@@ -28,7 +27,6 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
-  const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
   const [choreName, setChoreName] = useState('');
@@ -78,7 +76,7 @@ export default function HomeScreen() {
       await joinChore(choreId.trim());
       setChoreId('');
       setIdError('');
-      setIsJoinModalVisible(false);
+      setIsCreateModalVisible(false);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setIdError('Chore not found');
@@ -112,16 +110,12 @@ export default function HomeScreen() {
     setChoreToDelete(null);
   };
 
-  const handleCreateCancel = () => {
+  const handleModalCancel = () => {
     setChoreName('');
-    setNameError('');
-    setIsCreateModalVisible(false);
-  };
-
-  const handleJoinCancel = () => {
     setChoreId('');
+    setNameError('');
     setIdError('');
-    setIsJoinModalVisible(false);
+    setIsCreateModalVisible(false);
   };
 
   const handleLogoutPress = () => {
@@ -227,14 +221,6 @@ export default function HomeScreen() {
             fontWeight: 'bold',
           },
           headerShadowVisible: false,
-          headerRight: () => (
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={handleLogoutPress}
-            >
-              <Ionicons name="log-out" size={24} color="#ef4444" />
-            </TouchableOpacity>
-          ),
         }}
       />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -259,10 +245,10 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Create Chore Button */}
+        {/* Add Chore Button */}
         <TouchableOpacity
           style={[
-            styles.createButton,
+            styles.addButton,
             {
               backgroundColor: colors.primary,
               borderColor: colors.primary,
@@ -274,36 +260,31 @@ export default function HomeScreen() {
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
 
-        {/* Join Chore Button */}
+        {/* Logout Button */}
         <TouchableOpacity
           style={[
-            styles.joinButton,
+            styles.logoutButton,
             {
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
+              backgroundColor: '#ef4444',
+              borderColor: '#ef4444',
               shadowColor: colors.shadow,
             }
           ]}
-          onPress={() => setIsJoinModalVisible(true)}
+          onPress={handleLogoutPress}
         >
-          <Ionicons name="enter" size={28} color="#fff" />
+          <Ionicons name="log-out" size={28} color="#fff" />
         </TouchableOpacity>
 
         <CreateChoreModal
           visible={isCreateModalVisible}
           choreName={choreName}
-          nameError={nameError}
-          onClose={handleCreateCancel}
-          onCreateChore={handleCreateChore}
-          onNameChange={handleNameChange}
-        />
-
-        <JoinChoreModal
-          visible={isJoinModalVisible}
           choreId={choreId}
+          nameError={nameError}
           idError={idError}
-          onClose={handleJoinCancel}
+          onClose={handleModalCancel}
+          onCreateChore={handleCreateChore}
           onJoinChore={handleJoinChore}
+          onNameChange={handleNameChange}
           onIdChange={handleIdChange}
         />
 
@@ -414,11 +395,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  logoutButton: {
-    marginRight: 16,
-    padding: 8,
-  },
-  createButton: {
+  addButton: {
     position: 'absolute',
     bottom: 24,
     right: 24,
@@ -436,7 +413,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 2,
   },
-  joinButton: {
+  logoutButton: {
     position: 'absolute',
     bottom: 24,
     right: 88,

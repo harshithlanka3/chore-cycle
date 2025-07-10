@@ -73,7 +73,7 @@ export const useChores = () => {
     loadChores();
     
     // Connect to WebSocket
-    websocketService.connect('ws://localhost:8000/ws');
+    websocketService.connect();
 
     // Listen for real-time updates
     const handleChoreCreated = (data: any) => {

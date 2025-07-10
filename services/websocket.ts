@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 class WebSocketService {
   private ws: WebSocket | null = null;
   private listeners: { [key: string]: ((data: any) => void)[] } = {};
@@ -6,10 +8,16 @@ class WebSocketService {
   private reconnectDelay = 1000;
   private currentUrl = '';
 
-  connect(url: string = 'ws://localhost:8000/ws') {
-    this.currentUrl = url;
+  connect(url?: string) {
+    const defaultUrl = Constants.expoConfig?.extra?.wsUrl || 
+                      process.env.EXPO_PUBLIC_WS_URL || 
+                      'wss://localhost:8000/ws';
+
+    console.log(defaultUrl);
+
+    this.currentUrl = url || defaultUrl;
     try {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(this.currentUrl);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');

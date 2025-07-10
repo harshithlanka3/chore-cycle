@@ -1,9 +1,10 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 
 // Configure your backend URL - change this to your computer's IP for mobile testing
-const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000/api' 
-  : 'http://your-computer-ip:8000/api';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 
+                     process.env.EXPO_PUBLIC_API_BASE_URL || 
+                     'http://localhost:8000/api';
 
 export interface Person {
   id: string;

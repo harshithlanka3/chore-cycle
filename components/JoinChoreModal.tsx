@@ -9,23 +9,23 @@ import {
 } from 'react-native';
 import { colors } from '../constants/colors';
 
-interface CreateChoreModalProps {
+interface JoinChoreModalProps {
   visible: boolean;
-  choreName: string;
-  nameError: string;
+  choreId: string;
+  idError: string;
   onClose: () => void;
-  onCreateChore: () => void;
-  onNameChange: (text: string) => void;
+  onJoinChore: () => void;
+  onIdChange: (text: string) => void;
 }
 
-export default function CreateChoreModal({
+export default function JoinChoreModal({
   visible,
-  choreName,
-  nameError,
+  choreId,
+  idError,
   onClose,
-  onCreateChore,
-  onNameChange,
-}: CreateChoreModalProps) {
+  onJoinChore,
+  onIdChange,
+}: JoinChoreModalProps) {
   return (
     <Modal
       visible={visible}
@@ -41,28 +41,28 @@ export default function CreateChoreModal({
             borderColor: colors.cardBorder,
           }
         ]}>
-          <Text style={[styles.title, { color: colors.text }]}>Create New Chore</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Join Existing Chore</Text>
 
           <View style={styles.formContainer}>
-            <Text style={[styles.label, { color: colors.text }]}>Chore Name</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Chore ID</Text>
             <TextInput
               style={[
                 styles.input,
                 {
                   backgroundColor: colors.input,
-                  borderColor: nameError ? '#ef4444' : colors.inputBorder,
+                  borderColor: idError ? '#ef4444' : colors.inputBorder,
                   color: colors.text,
                 }
               ]}
-              placeholder="Enter chore name"
+              placeholder="Enter chore ID"
               placeholderTextColor={colors.secondaryText}
-              value={choreName}
-              onChangeText={onNameChange}
+              value={choreId}
+              onChangeText={onIdChange}
               autoFocus
-              onSubmitEditing={onCreateChore}
+              onSubmitEditing={onJoinChore}
             />
-            {nameError ? (
-              <Text style={styles.errorText}>{nameError}</Text>
+            {idError ? (
+              <Text style={styles.errorText}>{idError}</Text>
             ) : null}
           </View>
 
@@ -88,9 +88,9 @@ export default function CreateChoreModal({
                   borderColor: colors.inputBorder,
                 }
               ]}
-              onPress={onCreateChore}
+              onPress={onJoinChore}
             >
-              <Text style={[styles.submitButtonText, { color: colors.createButtonText }]}>Create</Text>
+              <Text style={[styles.submitButtonText, { color: colors.createButtonText }]}>Join</Text>
             </TouchableOpacity>
           </View>
         </View>

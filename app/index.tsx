@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   FlatList,
   SafeAreaView,
@@ -12,9 +12,11 @@ import {
   Text,
   RefreshControl,
   Modal,
+  Animated,
 } from 'react-native';
 import ChoreCard from '../components/ChoreCard';
 import CreateChoreModal from '../components/CreateChoreModal';
+import JoinChoreModal from '../components/JoinChoreModal';
 import DeleteChoreModal from '../components/DeleteChoreModal';
 import EmptyState from '../components/EmptyState';
 import { colors } from '../constants/colors';
@@ -27,6 +29,7 @@ export default function HomeScreen() {
   const { user, logout } = useAuth();
   
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
   const [choreName, setChoreName] = useState('');
@@ -35,6 +38,8 @@ export default function HomeScreen() {
   const [idError, setIdError] = useState('');
   const [choreToDelete, setChoreToDelete] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const fabAnimation = useRef(new Animated.Value(0)).current;
 
   // Calculate number of columns based on screen width
   const getNumColumns = () => {
@@ -49,6 +54,18 @@ export default function HomeScreen() {
   const numColumns = getNumColumns();
   const gap = 12;
   const itemWidth = (screenWidth - 32 - (numColumns - 1) * gap) / numColumns;
+
+  const toggleFabMenu = () => {
+    const toValue = fabMenuOpen ? 0 : 1;
+    setFabMenuOpen(!fabMenuOpen);
+    
+    Animated.spring(fabAnimation, {
+      toValue,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+  };
 
   const handleCreateChore = async () => {
     if (!choreName.trim()) {
@@ -76,7 +93,7 @@ export default function HomeScreen() {
       await joinChore(choreId.trim());
       setChoreId('');
       setIdError('');
-      setIsCreateModalVisible(false);
+      setIsJoinModalVisible(false);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setIdError('Chore not found');
@@ -110,16 +127,49 @@ export default function HomeScreen() {
     setChoreToDelete(null);
   };
 
-  const handleModalCancel = () => {
+  const handleCreateModalClose = () => {
     setChoreName('');
-    setChoreId('');
     setNameError('');
-    setIdError('');
     setIsCreateModalVisible(false);
   };
 
+  const handleJoinModalClose = () => {
+    setChoreId('');
+    setIdError('');
+    setIsJoinModalVisible(false);
+  };
+
   const handleLogoutPress = () => {
+    setFabMenuOpen(false);
+    Animated.spring(fabAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
     setIsLogoutModalVisible(true);
+  };
+
+  const handleCreatePress = () => {
+    setFabMenuOpen(false);
+    Animated.spring(fabAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+    setIsCreateModalVisible(true);
+  };
+
+  const handleJoinPress = () => {
+    setFabMenuOpen(false);
+    Animated.spring(fabAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+    setIsJoinModalVisible(true);
   };
 
   const confirmLogout = () => {
@@ -245,49 +295,135 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Add Chore Button */}
-        <TouchableOpacity
-          style={[
-            styles.addButton,
-            {
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
-              shadowColor: colors.shadow,
-            }
-          ]}
-          onPress={() => setIsCreateModalVisible(true)}
-        >
-          <Ionicons name="add" size={28} color="#fff" />
-        </TouchableOpacity>
+        {/* FAB Menu Overlay */}
+        {fabMenuOpen && (
+          <TouchableOpacity 
+            style={styles.fabOverlay} 
+            activeOpacity={1} 
+            onPress={toggleFabMenu}
+          />
+        )}
 
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={[
-            styles.logoutButton,
-            {
-              backgroundColor: '#ef4444',
-              borderColor: '#ef4444',
-              shadowColor: colors.shadow,
-            }
-          ]}
-          onPress={handleLogoutPress}
-        >
-          <Ionicons name="log-out" size={28} color="#fff" />
-        </TouchableOpacity>
+        {/* Vertical FAB Container */}
+        <View style={styles.fabContainer}>
+          {(() => {
+            const fabSpacing = 20;
+            
+            const fabItems = [
+              {
+                key: 'logout',
+                label: 'Logout',
+                icon: 'log-out',
+                backgroundColor: '#ef4444',
+                onPress: handleLogoutPress,
+              },
+              {
+                key: 'join',
+                label: 'Join Chore',
+                icon: 'enter',
+                backgroundColor: colors.secondary,
+                onPress: handleJoinPress,
+              },
+              {
+                key: 'create',
+                label: 'Create Chore',
+                icon: 'add-circle',
+                backgroundColor: colors.createButton,
+                onPress: handleCreatePress,
+              },
+            ];
 
+            return fabItems.map((item, index) => (
+              <Animated.View
+                key={item.key}
+                style={[
+                  styles.subFab,
+                  {
+                    transform: [
+                      {
+                        translateY: fabAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -(fabItems.length - index) * fabSpacing],
+                        }),
+                      },
+                      {
+                        scale: fabAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 1],
+                        }),
+                      },
+                    ],
+                    opacity: fabAnimation,
+                  },
+                ]}
+              >
+                <Text style={[styles.subFabLabel, { color: colors.text }]}>{item.label}</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.subFabButton,
+                    { backgroundColor: item.backgroundColor }
+                  ]}
+                  onPress={item.onPress}
+                >
+                  <Ionicons name={item.icon as any} size={24} color="#fff" />
+                </TouchableOpacity>
+              </Animated.View>
+            ));
+          })()}
+
+          {/* Main FAB */}
+          <Animated.View
+            style={[
+              styles.fab,
+              {
+                transform: [
+                  {
+                    rotate: fabAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '45deg'],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.fabButton,
+                {
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                  shadowColor: colors.shadow,
+                }
+              ]}
+              onPress={toggleFabMenu}
+            >
+              <Ionicons name="add" size={28} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+
+        {/* Create Chore Modal */}
         <CreateChoreModal
           visible={isCreateModalVisible}
           choreName={choreName}
-          choreId={choreId}
           nameError={nameError}
-          idError={idError}
-          onClose={handleModalCancel}
+          onClose={handleCreateModalClose}
           onCreateChore={handleCreateChore}
-          onJoinChore={handleJoinChore}
           onNameChange={handleNameChange}
+        />
+
+        {/* Join Chore Modal */}
+        <JoinChoreModal
+          visible={isJoinModalVisible}
+          choreId={choreId}
+          idError={idError}
+          onClose={handleJoinModalClose}
+          onJoinChore={handleJoinChore}
           onIdChange={handleIdChange}
         />
 
+        {/* Delete Chore Modal */}
         <DeleteChoreModal
           visible={isDeleteModalVisible}
           onConfirm={confirmDelete}
@@ -395,10 +531,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  addButton: {
+  fabOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 999,
+  },
+  fabContainer: {
     position: 'absolute',
     bottom: 24,
     right: 24,
+    flexDirection: 'column',
+    alignItems: 'center',
+    zIndex: 1001,
+  },
+  fab: {
+    zIndex: 1002,
+  },
+  fabButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -413,23 +566,35 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 2,
   },
-  logoutButton: {
-    position: 'absolute',
-    bottom: 24,
-    right: 88,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  subFab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  subFabButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-    borderWidth: 2,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  subFabLabel: {
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    textAlign: 'center',
+    minWidth: 60,
   },
   modalOverlay: {
     flex: 1,

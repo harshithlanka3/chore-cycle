@@ -9,8 +9,9 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Share,
+  Animated,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import AddPersonModal from '../../components/AddPersonModal';
 import DeletePersonModal from '../../components/DeletePersonModal';
 import { colors } from '../../constants/colors';
@@ -26,11 +27,13 @@ export default function ChoreDetailScreen() {
   const { user } = useAuth();
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [email, setEmail] = useState(''); // Changed from username to email
+  const [email, setEmail] = useState('');
   const [nameError, setNameError] = useState('');
   const [personToDelete, setPersonToDelete] = useState<Person | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const fabAnimation = useRef(new Animated.Value(0)).current;
 
   const chore = getChoreById(id);
 
@@ -50,6 +53,33 @@ export default function ChoreDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  const toggleFabMenu = () => {
+    const toValue = fabMenuOpen ? 0 : 1;
+    setFabMenuOpen(!fabMenuOpen);
+    
+    Animated.spring(fabAnimation, {
+      toValue,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+  };
+
+  const handleCopyChoreId = async () => {
+    try {
+      await Clipboard.setStringAsync(chore.id);
+      setFabMenuOpen(false);
+      Animated.spring(fabAnimation, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start();
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+    }
+  };
 
   const handleAddPerson = async () => {
     if (!email.trim()) {
@@ -137,20 +167,31 @@ export default function ChoreDetailScreen() {
     }
   };
 
-  const handleShareChore = async () => {
-    try {
-      await Share.share({
-        message: `Join my chore "${chore.name}"! Use this ID: ${chore.id}`,
-        title: 'Join Chore',
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
+  const handleAddPersonPress = () => {
+    setFabMenuOpen(false);
+    Animated.spring(fabAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+    setIsAddModalVisible(true);
+  };
+
+  const handleLeaveChorePress = () => {
+    setFabMenuOpen(false);
+    Animated.spring(fabAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+    handleLeaveChore();
   };
 
   const renderPerson = ({ item, index }: { item: Person; index: number }) => {
     const isCurrent = index === chore.currentPersonIndex;
-    const isCurrentUser = user && item.user_id === user.id; // Changed from item.name === user.username
+    const isCurrentUser = user && item.user_id === user.id;
     const canRemove = user && (chore.createdBy === user.id || isCurrentUser);
     
     return (
@@ -214,7 +255,7 @@ export default function ChoreDetailScreen() {
   });
 
   const isCreator = user && chore.createdBy === user.id;
-  const isParticipant = user && chore.people.some(p => p.user_id === user.id); // Changed from p.name === user.username
+  const isParticipant = user && chore.people.some(p => p.user_id === user.id);
   const currentPerson = chore.people.length > 0 ? chore.people[chore.currentPersonIndex] : null;
 
   return (
@@ -238,25 +279,6 @@ export default function ChoreDetailScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={handleShareChore}
-              >
-                <Ionicons name="share" size={24} color="#fff" />
-              </TouchableOpacity>
-              {isParticipant && !isCreator && (
-                <TouchableOpacity
-                  style={styles.headerButton}
-                  onPress={handleLeaveChore}
-                  disabled={loading}
-                >
-                  <Ionicons name="exit" size={24} color="#fff" />
-                </TouchableOpacity>
-              )}
-            </View>
           ),
         }}
       />
@@ -332,27 +354,123 @@ export default function ChoreDetailScreen() {
           )}
         </View>
 
-        {/* Add Person FAB */}
-        <TouchableOpacity
-          style={[
-            styles.fab,
-            {
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
-              shadowColor: colors.shadow,
-              opacity: loading ? 0.6 : 1
-            }
-          ]}
-          onPress={() => setIsAddModalVisible(true)}
-          disabled={loading}
-        >
-          <Ionicons name="person-add" size={28} color="#fff" />
-        </TouchableOpacity>
+        {/* FAB Menu Overlay */}
+        {fabMenuOpen && (
+          <TouchableOpacity 
+            style={styles.fabOverlay} 
+            activeOpacity={1} 
+            onPress={toggleFabMenu}
+          />
+        )}
+
+        {/* Vertical FAB Container */}
+        <View style={styles.fabContainer}>
+          {(() => {
+            const fabSpacing = 20; // Adjust this value to change spacing between FABs
+            
+            const fabItems = [
+              // Copy ID FAB (always visible)
+              {
+                key: 'copy',
+                label: 'Copy ID',
+                icon: 'copy',
+                backgroundColor: colors.secondary,
+                onPress: handleCopyChoreId,
+              },
+              // Add Person FAB (always visible)
+              {
+                key: 'add',
+                label: 'Add Person',
+                icon: 'person-add',
+                backgroundColor: colors.createButton,
+                onPress: handleAddPersonPress,
+              },
+              // Leave Chore FAB (conditional)
+              ...(isParticipant && !isCreator ? [{
+                key: 'leave',
+                label: 'Leave',
+                icon: 'exit',
+                backgroundColor: '#ef4444',
+                onPress: handleLeaveChorePress,
+              }] : []),
+            ];
+
+            return fabItems.map((item, index) => (
+              <Animated.View
+                key={item.key}
+                style={[
+                  styles.subFab,
+                  {
+                    transform: [
+                      {
+                        translateY: fabAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -(fabItems.length - index) * fabSpacing],
+                        }),
+                      },
+                      {
+                        scale: fabAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 1],
+                        }),
+                      },
+                    ],
+                    opacity: fabAnimation,
+                  },
+                ]}
+              >
+                <Text style={[styles.subFabLabel, { color: colors.text }]}>{item.label}</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.subFabButton,
+                    { backgroundColor: item.backgroundColor }
+                  ]}
+                  onPress={item.onPress}
+                >
+                  <Ionicons name={item.icon as any} size={24} color="#fff" />
+                </TouchableOpacity>
+              </Animated.View>
+            ));
+          })()}
+
+          {/* Main FAB */}
+          <Animated.View
+            style={[
+              styles.fab,
+              {
+                transform: [
+                  {
+                    rotate: fabAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '45deg'],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.fabButton,
+                {
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
+                  shadowColor: colors.shadow,
+                  opacity: loading ? 0.6 : 1
+                }
+              ]}
+              onPress={toggleFabMenu}
+              disabled={loading}
+            >
+              <Ionicons name="add" size={28} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
 
         {/* Add Person Modal */}
         <AddPersonModal
           visible={isAddModalVisible}
-          email={email} // Changed from username
+          email={email}
           nameError={nameError}
           onClose={() => {
             setEmail('');
@@ -360,7 +478,7 @@ export default function ChoreDetailScreen() {
             setIsAddModalVisible(false);
           }}
           onAddPerson={handleAddPerson}
-          onEmailChange={(text) => { // Changed from onUsernameChange
+          onEmailChange={(text) => {
             setEmail(text);
             if (nameError && text.trim()) {
               setNameError('');
@@ -415,17 +533,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   homeButton: {
-    marginLeft: 16,
+    marginLeft: 8,
     paddingVertical: 8,
     paddingHorizontal: 8,
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerButton: {
-    marginRight: 16,
-    padding: 4,
   },
   choreInfoContainer: {
     backgroundColor: colors.cardBackground,
@@ -497,7 +607,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 2,
     position: 'relative',
-    width: screenWidth - 64, // Full width minus padding
+    width: screenWidth - 64,
     maxWidth: 300,
   },
   deletePersonButton: {
@@ -517,7 +627,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingRight: 40, // Account for delete button
   },
   currentBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -556,10 +665,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  fab: {
+  fabOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 999,
+  },
+  fabContainer: {
     position: 'absolute',
     bottom: 24,
     right: 24,
+    flexDirection: 'column',
+    alignItems: 'center',
+    zIndex: 1001,
+  },
+  fab: {
+    zIndex: 1002,
+  },
+  fabButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -573,5 +699,35 @@ const styles = StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 8,
     borderWidth: 2,
+  },
+  subFab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  subFabButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  subFabLabel: {
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    textAlign: 'center',
+    minWidth: 60,
   },
 });
